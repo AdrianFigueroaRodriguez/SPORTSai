@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Adversarial Sports Betting Wireframes</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Adversarial Regime Analysis — Wireframe Studio</h1>
+        <p>Interactive prototype to tune assumptions, generate structured outputs, and test hedge symmetry.</p>
+      </div>
+      <button id="reset-btn" class="ghost">Reset Defaults</button>
+    </header>
+
+    <main class="layout">
+      <aside class="panel controls">
+        <h2>1) Inputs & Assumptions</h2>
+
+        <section>
+          <h3>Games</h3>
+          <textarea id="games" rows="4" placeholder="e.g., Lakers @ Nuggets\nCeltics @ Bucks"></textarea>
+        </section>
+
+        <section>
+          <h3>Core Settings</h3>
+          <label>Bankroll (MXN)
+            <input id="bankroll" type="number" min="100" step="25" value="500" />
+          </label>
+          <label>Tickets
+            <input id="tickets" type="number" min="2" max="8" value="4" />
+          </label>
+          <label>Home Advantage (%)
+            <input id="homeAdvantage" type="range" min="-5" max="10" step="0.1" value="2.5" />
+            <span id="homeAdvantageVal"></span>
+          </label>
+          <label>Probability Std Dev σₚ (%)
+            <input id="sigma" type="range" min="0.5" max="2" step="0.1" value="1.2" />
+            <span id="sigmaVal"></span>
+          </label>
+          <label>Hidden Chaos Factor (%)
+            <input id="chaos" type="range" min="0" max="8" step="0.2" value="2" />
+            <span id="chaosVal"></span>
+          </label>
+        </section>
+
+        <section>
+          <h3>Regime Pressure</h3>
+          <label>Efficiency Gap Weight
+            <input id="efficiencyGap" type="range" min="0" max="100" value="25" />
+          </label>
+          <label>Coin-Flip Parity Weight
+            <input id="coinFlip" type="range" min="0" max="100" value="20" />
+          </label>
+          <label>Fatigue Distortion Weight
+            <input id="fatigue" type="range" min="0" max="100" value="15" />
+          </label>
+          <label>Pace/Volatility Inflation Weight
+            <input id="pace" type="range" min="0" max="100" value="20" />
+          </label>
+          <label>Defensive Compression Weight
+            <input id="defense" type="range" min="0" max="100" value="20" />
+          </label>
+        </section>
+
+        <section>
+          <h3>Allocation Overrides</h3>
+          <label>
+            <input id="extremeSkew" type="checkbox" /> Extreme regime skew (80%+)
+          </label>
+          <label>
+            <input id="injuryShock" type="checkbox" /> Injury shock (>4% model move)
+          </label>
+          <label>
+            <input id="clvUnder" type="checkbox" /> CLV underperformance mode
+          </label>
+        </section>
+
+        <button id="generate" class="primary">Generate Wireframe Outputs</button>
+      </aside>
+
+      <section class="panel outputs">
+        <h2>2) Structured Output Preview</h2>
+
+        <article class="card">
+          <h3>Regime Classification</h3>
+          <div id="regimeOutput" class="table"></div>
+        </article>
+
+        <article class="card">
+          <h3>Probability + σₚ Table</h3>
+          <div id="probOutput" class="table"></div>
+        </article>
+
+        <article class="card">
+          <h3>Capital Allocation Table</h3>
+          <div id="capitalOutput" class="table"></div>
+        </article>
+
+        <article class="card">
+          <h3>Scenario Coverage Map</h3>
+          <ul id="scenarioOutput" class="map"></ul>
+        </article>
+
+        <article class="card">
+          <h3>Risk Commentary</h3>
+          <p id="riskOutput" class="risk"></p>
+        </article>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
