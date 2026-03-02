@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ARF Totals Model — NBA Analytics Engine</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ============================
+       CSS VARIABLES & RESET
+    ============================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #050a0f;
+      --bg2:      #080f18;
+      --bg3:      #0c1824;
+      --panel:    #0d1e2e;
+      --border:   #1a3550;
+      --amber:    #f0a500;
+      --amber2:   #ffc93c;
+      --cyan:     #00d4ff;
+      --green:    #00e676;
+      --red:      #ff4560;
+      --text:     #c8dde8;
+      --text-dim: #5a7e9a;
+      --mono:     'Share Tech Mono', monospace;
+      --head:     'Barlow Condensed', sans-serif;
+      --body:     'Barlow', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body);
+      font-size: 15px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ============================
+       SCANLINE OVERLAY
+    ============================ */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ============================
+       NAVBAR
+    ============================ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(5,10,15,0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 2rem;
+      height: 56px;
+    }
+
+    .nav-logo {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+    }
+
+    .nav-logo span { color: var(--cyan); }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      font-family: var(--head);
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--amber); }
+
+    .nav-badge {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--green);
+      border: 1px solid var(--green);
+      padding: 2px 8px;
+      border-radius: 2px;
+      animation: pulse-badge 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-badge {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ============================
+       HERO
+    ============================ */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      background-position: center center;
+    }
+
+    .hero-glow {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%,-50%);
+      width: 800px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(240,165,0,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-inner {
+      position: relative;
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .hero-tag {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+    }
+
+    .hero-title {
+      font-family: var(--head);
+      font-weight: 900;
+      font-size: clamp(3.5rem, 10vw, 7rem);
+      line-height: 0.92;
+      letter-spacing: -0.01em;
+      color: #fff;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero-title .accent { color: var(--amber); }
+
+    .hero-subtitle {
+      font-family: var(--head);
+      font-weight: 300;
+      font-size: clamp(1rem, 2.5vw, 1.5rem);
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 2.5rem;
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 3rem;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+
+    .stat-item { text-align: center; }
+
+    .stat-value {
+      font-family: var(--mono);
+      font-size: 2rem;
+      color: var(--amber);
+      display: block;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .hero-btn {
+      display: inline-block;
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--bg);
+      background: var(--amber);
+      padding: 14px 36px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+
+    .hero-btn:hover { background: var(--amber2); transform: translateY(-2px); }
+
+    /* ============================
+       SECTIONS
+    ============================ */
+    section {
+      padding: 80px 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .section-title {
+      font-family: var(--head);
+      font-weight: 900;
+      font-size: clamp(2rem, 4vw, 3rem);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: #fff;
+      margin-bottom: 2.5rem;
+    }
+
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, var(--amber) 0%, transparent 60%);
+      margin-bottom: 3rem;
+    }
+
+    /* ============================
+       VARIABLE CARDS
+    ============================ */
+    #variables { background: var(--bg2); max-width: 100%; padding: 80px 2rem; }
+    #variables .inner { max-width: 1100px; margin: 0 auto; }
+
+    .var-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .var-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 1.8rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, transform 0.2s;
+    }
+
+    .var-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--amber);
+      transition: width 0.3s;
+    }
+
+    .var-card:hover { border-color: var(--amber); transform: translateY(-3px); }
+    .var-card:hover::before { width: 5px; }
+    .var-card.secondary::before { background: var(--cyan); }
+    .var-card.secondary:hover { border-color: var(--cyan); }
+
+    .var-id {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-bottom: 0.3rem;
+    }
+
+    .var-name {
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 1.2rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #fff;
+      margin-bottom: 0.6rem;
+    }
+
+    .var-abbr {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--amber);
+      margin-bottom: 1rem;
+    }
+
+    .var-card.secondary .var-abbr { color: var(--cyan); }
+
+    .var-desc {
+      font-size: 0.88rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 1.2rem;
+    }
+
+    .weight-range {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .weight-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    .weight-bar-bg {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .weight-bar-fill {
+      height: 100%;
+      background: var(--amber);
+      border-radius: 2px;
+    }
+
+    .var-card.secondary .weight-bar-fill { background: var(--cyan); }
+
+    /* ============================
+       CONFIDENCE CALCULATOR
+    ============================ */
+    #calculator { background: var(--bg); }
+
+    .calc-layout {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 2rem;
+    }
+
+    @media (max-width: 800px) {
+      .calc-layout { grid-template-columns: 1fr; }
+      nav .nav-links { display: none; }
+    }
+
+    .slider-group { margin-bottom: 1.8rem; }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+
+    .slider-name {
+      font-family: var(--head);
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .slider-val {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: var(--amber);
+    }
+
+    .slider-sub {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+
+    .slider-weight {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--border);
+      outline: none;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--amber);
+      cursor: pointer;
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 8px rgba(240,165,0,0.5);
+    }
+
+    input[type="range"].secondary-slider::-webkit-slider-thumb {
+      background: var(--cyan);
+      box-shadow: 0 0 8px rgba(0,212,255,0.5);
+    }
+
+    /* Output panel */
+    .output-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      position: sticky;
+      top: 70px;
+      height: fit-content;
+    }
+
+    .output-title {
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.8rem;
+    }
+
+    .conf-score-display {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .conf-big {
+      font-family: var(--mono);
+      font-size: 4.5rem;
+      line-height: 1;
+      color: var(--amber);
+      transition: color 0.3s;
+    }
+
+    .conf-big.high { color: var(--green); }
+    .conf-big.low  { color: var(--red); }
+
+    .conf-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+      margin-top: 0.4rem;
+    }
+
+    .gauge {
+      width: 100%;
+      height: 10px;
+      background: var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      border-radius: 5px;
+      background: linear-gradient(90deg, var(--red), var(--amber) 55%, var(--green));
+      background-size: 300px 100%;
+      background-repeat: no-repeat;
+      transition: width 0.4s ease;
+    }
+
+    .threshold-line {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      margin-bottom: 1.5rem;
+    }
+
+    .thresh-mark {
+      width: 2px;
+      height: 10px;
+      background: var(--amber);
+    }
+
+    .breakdown-list {
+      list-style: none;
+    }
+
+    .breakdown-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(26,53,80,0.5);
+      font-size: 0.82rem;
+    }
+
+    .breakdown-list li:last-child { border-bottom: none; }
+    .bl-name { color: var(--text-dim); font-family: var(--mono); font-size: 0.7rem; }
+    .bl-val  { color: var(--amber); font-family: var(--mono); font-size: 0.75rem; }
+
+    .verdict-box {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      text-align: center;
+      transition: border-color 0.3s, background 0.3s;
+    }
+
+    .verdict-box.pass { border-color: var(--green); background: rgba(0,230,118,0.06); }
+    .verdict-box.fail { border-color: var(--red);   background: rgba(255,69,96,0.06); }
+
+    .verdict-text {
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .verdict-box.pass .verdict-text { color: var(--green); }
+    .verdict-box.fail .verdict-text { color: var(--red); }
+
+    .verdict-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 0.3rem;
+      font-family: var(--mono);
+    }
+
+    /* weight sum warning */
+    .weight-warning {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--red);
+      margin-top: 0.5rem;
+      min-height: 1rem;
+    }
+
+    /* ============================
+       MONTE CARLO SECTION
+    ============================ */
+    #montecarlo { background: var(--bg2); max-width: 100%; padding: 80px 2rem; }
+    #montecarlo .inner { max-width: 1100px; margin: 0 auto; }
+
+    .mc-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 800px) { .mc-layout { grid-template-columns: 1fr; } }
+
+    .mc-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 2rem;
+    }
+
+    .mc-title {
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 1.5rem;
+    }
+
+    .mc-control {
+      margin-bottom: 1.2rem;
+    }
+
+    .mc-label {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.1em;
+    }
+
+    .mc-select {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      padding: 8px 12px;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .mc-select:focus { outline: 1px solid var(--amber); }
+
+    .mc-run-btn {
+      width: 100%;
+      background: transparent;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 14px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      margin-top: 1.2rem;
+    }
+
+    .mc-run-btn:hover { background: var(--amber); color: var(--bg); }
+    .mc-run-btn:disabled { opacity: 0.4; cursor: default; }
+
+    .mc-progress-wrap {
+      margin-top: 1rem;
+    }
+
+    .mc-progress-bar-bg {
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 0.4rem;
+    }
+
+    .mc-progress-bar-fill {
+      height: 100%;
+      background: var(--cyan);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .mc-progress-label {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .mc-results { margin-top: 1.5rem; }
+
+    .mc-result-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(26,53,80,0.5);
+      font-size: 0.82rem;
+    }
+
+    .mc-result-row:last-child { border-bottom: none; }
+    .mc-rkey { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); }
+    .mc-rval { font-family: var(--mono); font-size: 0.75rem; color: var(--cyan); }
+
+    /* Canvas chart */
+    #mcCanvas {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      display: block;
+    }
+
+    /* ============================
+       FORMULA TABLE
+    ============================ */
+    .formula-block {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--amber);
+      padding: 1.5rem 2rem;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 2;
+      color: var(--text);
+      overflow-x: auto;
+      margin-bottom: 2rem;
+    }
+
+    .formula-block span.kw { color: var(--amber); }
+    .formula-block span.fn { color: var(--cyan); }
+    .formula-block span.cm { color: var(--text-dim); }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    table.data-table th {
+      font-family: var(--head);
+      font-weight: 600;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    table.data-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(26,53,80,0.4);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 0.8rem;
+    }
+
+    table.data-table tr:last-child td { border-bottom: none; }
+    table.data-table tr:hover td { background: rgba(240,165,0,0.04); }
+
+    .badge {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      padding: 2px 7px;
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+    }
+
+    .badge-core { background: rgba(240,165,0,0.15); color: var(--amber); border: 1px solid rgba(240,165,0,0.3); }
+    .badge-sec  { background: rgba(0,212,255,0.1);  color: var(--cyan);  border: 1px solid rgba(0,212,255,0.25); }
+
+    /* ============================
+       DEPLOYMENT RULES
+    ============================ */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+
+    .rule-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      padding: 1.4rem;
+      position: relative;
+    }
+
+    .rule-icon {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: var(--amber);
+      margin-bottom: 0.6rem;
+    }
+
+    .rule-title {
+      font-family: var(--head);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+
+    .rule-val {
+      font-family: var(--mono);
+      font-size: 1.4rem;
+      color: var(--green);
+      margin-bottom: 0.3rem;
+    }
+
+    .rule-desc {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ============================
+       FOOTER
+    ============================ */
+    footer {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      text-align: center;
+    }
+
+    .footer-logo {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--amber);
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-copy {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      font-family: var(--mono);
+    }
+
+    /* ============================
+       ANIMATIONS
+    ============================ */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-up { animation: fade-up 0.7s ease both; }
+    .fade-up-2 { animation: fade-up 0.7s ease 0.15s both; }
+    .fade-up-3 { animation: fade-up 0.7s ease 0.3s both; }
+    .fade-up-4 { animation: fade-up 0.7s ease 0.45s both; }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <div class="nav-logo">ARF<span>//</span>TOTALS</div>
+  <ul class="nav-links">
+    <li><a href="#variables">Variables</a></li>
+    <li><a href="#calculator">Calculator</a></li>
+    <li><a href="#formula">Formula</a></li>
+    <li><a href="#montecarlo">Monte Carlo</a></li>
+    <li><a href="#deploy">Deployment</a></li>
+  </ul>
+  <div class="nav-badge">LIVE v1.0</div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <p class="hero-tag fade-up">NBA Totals Analytics Engine — Reduced Core Build</p>
+    <h1 class="hero-title fade-up-2">ARF<br /><span class="accent">Totals</span><br />Model</h1>
+    <p class="hero-subtitle fade-up-3">7-Variable Confidence Scoring Framework</p>
+    <div class="hero-stats fade-up-4">
+      <div class="stat-item">
+        <span class="stat-value">7</span>
+        <span class="stat-label">Model Variables</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">80%</span>
+        <span class="stat-label">Confidence Threshold</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">200K</span>
+        <span class="stat-label">Max MC Iterations</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-value">57%+</span>
+        <span class="stat-label">Target Hit Rate</span>
+      </div>
+    </div>
+    <a href="#calculator" class="hero-btn fade-up-4">Launch Calculator</a>
+  </div>
+</section>
+
+<!-- VARIABLES -->
+<div id="variables">
+  <div class="inner">
+    <p class="section-label">Model Architecture</p>
+    <h2 class="section-title">Core Variables</h2>
+    <div class="divider"></div>
+    <div class="var-grid">
+
+      <div class="var-card">
+        <div class="var-id">CORE-01</div>
+        <div class="var-name">Pace Alignment Coefficient</div>
+        <div class="var-abbr">PAC</div>
+        <div class="var-desc">Measures possession volume and tempo agreement between both teams. Alignment factor of 1.10 indicates strong tempo agreement; 0.90 indicates conflicting styles.</div>
+        <div class="weight-range">
+          <span class="weight-label">18% – 26%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:60%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card">
+        <div class="var-id">CORE-02</div>
+        <div class="var-name">Market Edge Delta</div>
+        <div class="var-abbr">MED</div>
+        <div class="var-desc">Projected Total minus Market Total. Zones: &lt;2 noise, 2–4 tradable, 4–6 high edge, &gt;6 revalidation required. Linear scale capped at 8 pts.</div>
+        <div class="weight-range">
+          <span class="weight-label">20% – 28%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:72%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card">
+        <div class="var-id">CORE-03</div>
+        <div class="var-name">Shooting Convergence Index</div>
+        <div class="var-abbr">SCI</div>
+        <div class="var-desc">Measures offensive efficiency compatibility via 2P% cross-matching plus 3P volume interaction coefficient. Scaled 0–100.</div>
+        <div class="weight-range">
+          <span class="weight-label">14% – 20%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:48%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card">
+        <div class="var-id">CORE-04</div>
+        <div class="var-name">Free Throw Interaction Index</div>
+        <div class="var-abbr">FTI</div>
+        <div class="var-desc">Cross-product of FT rate and foul% for each team. Adjusted by spread proximity and late-game script probability. Scaled 0–100.</div>
+        <div class="weight-range">
+          <span class="weight-label">12% – 18%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:40%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card">
+        <div class="var-id">CORE-05</div>
+        <div class="var-name">Spread Stability Score</div>
+        <div class="var-abbr">SSS</div>
+        <div class="var-desc">Encodes game script volatility. Spread &lt;5 scores 100; 6–9 scores 80; 10+ scores 60. Tighter spreads increase confidence in scoring exchange.</div>
+        <div class="weight-range">
+          <span class="weight-label">8% – 14%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:32%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card secondary">
+        <div class="var-id">SEC-06</div>
+        <div class="var-name">ORTG Compression Index</div>
+        <div class="var-abbr">OCI</div>
+        <div class="var-desc">100 minus the absolute ORTG gap. High compression improves scoring exchange persistence. Monte Carlo calibrated secondary variable.</div>
+        <div class="weight-range">
+          <span class="weight-label">5% – 12%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:24%;"></div></div>
+        </div>
+      </div>
+
+      <div class="var-card secondary">
+        <div class="var-id">SEC-07</div>
+        <div class="var-name">Defensive 3P Compatibility</div>
+        <div class="var-abbr">D3PC</div>
+        <div class="var-desc">3P attempt rate times opponent 3P allowed %. Overs spike when high 3P volume meets permissive perimeter defense. Monte Carlo calibrated.</div>
+        <div class="weight-range">
+          <span class="weight-label">5% – 12%</span>
+          <div class="weight-bar-bg"><div class="weight-bar-fill" style="width:24%;"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- FORMULA REFERENCE -->
+<section id="formula">
+  <p class="section-label">Mathematical Framework</p>
+  <h2 class="section-title">Model Formula</h2>
+  <div class="divider"></div>
+
+  <div class="formula-block">
+    <span class="cm">// CONFIDENCE SCORE FUNCTION</span><br/>
+    <span class="kw">CONF</span> = w1 × <span class="fn">PAC</span>
+           + w2 × <span class="fn">MED</span>
+           + w3 × <span class="fn">SCI</span>
+           + w4 × <span class="fn">FTI</span>
+           + w5 × <span class="fn">SSS</span>
+           + w6 × <span class="fn">OCI</span>
+           + w7 × <span class="fn">D3PC</span><br/><br/>
+    <span class="cm">// CONSTRAINTS</span><br/>
+    <span class="kw">Σ</span>(w1..w7) = 100%<br/>
+    <span class="kw">Σ</span>(w1..w5) ≥ 75%   <span class="cm">// Core minimum</span><br/>
+    <span class="kw">Σ</span>(w6..w7) ≤ 25%   <span class="cm">// Secondary cap</span><br/><br/>
+    <span class="cm">// OPTIMIZATION TARGET</span><br/>
+    <span class="kw">F</span> = (0.5 × HitRate<sub>≥80%</sub>) + (0.3 × EV) + (0.2 × StabilityScore)<br/>
+    <span class="cm">// Subject to: Drawdown &lt; 12%</span>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Abbr</th>
+        <th>Type</th>
+        <th>Weight Range</th>
+        <th>Scale</th>
+        <th>MED Delta Zone</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Pace Alignment Coefficient</td>
+        <td>PAC</td>
+        <td><span class="badge badge-core">CORE</span></td>
+        <td>18% – 26%</td>
+        <td>0–100</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Market Edge Delta</td>
+        <td>MED</td>
+        <td><span class="badge badge-core">CORE</span></td>
+        <td>20% – 28%</td>
+        <td>0–8 pts</td>
+        <td>&lt;2 Noise / 2–4 Trade / 4–6 Edge / &gt;6 Revalidate</td>
+      </tr>
+      <tr>
+        <td>Shooting Convergence Index</td>
+        <td>SCI</td>
+        <td><span class="badge badge-core">CORE</span></td>
+        <td>14% – 20%</td>
+        <td>0–100</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Free Throw Interaction Index</td>
+        <td>FTI</td>
+        <td><span class="badge badge-core">CORE</span></td>
+        <td>12% – 18%</td>
+        <td>0–100</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Spread Stability Score</td>
+        <td>SSS</td>
+        <td><span class="badge badge-core">CORE</span></td>
+        <td>8% – 14%</td>
+        <td>60 / 80 / 100</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>ORTG Compression Index</td>
+        <td>OCI</td>
+        <td><span class="badge badge-sec">SECONDARY</span></td>
+        <td>5% – 12%</td>
+        <td>0–100</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>Defensive 3P Compatibility</td>
+        <td>D3PC</td>
+        <td><span class="badge badge-sec">SECONDARY</span></td>
+        <td>5% – 12%</td>
+        <td>0–100</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- CONFIDENCE CALCULATOR -->
+<section id="calculator">
+  <p class="section-label">Interactive Tool</p>
+  <h2 class="section-title">Confidence Calculator</h2>
+  <div class="divider"></div>
+
+  <div class="calc-layout">
+    <!-- Sliders -->
+    <div>
+      <p style="font-size:0.82rem;color:var(--text-dim);margin-bottom:1.8rem;">
+        Adjust variable scores (0–100) and weights. Core variable weights must sum ≥ 75%.
+        Secondary weights are capped at 25% combined.
+      </p>
+
+      <h3 style="font-family:var(--head);font-size:0.8rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--amber);margin-bottom:1.2rem;">Core Variables</h3>
+
+      <!-- PAC -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">PAC — Pace Alignment</span>
+          <span class="slider-val" id="pac-val">72</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="pac-w-disp">22</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 18–26%</span>
+        </div>
+        <input type="range" id="pac-score" min="0" max="100" value="72" />
+        <input type="range" id="pac-w" min="18" max="26" value="22" />
+      </div>
+
+      <!-- MED -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">MED — Market Edge Delta</span>
+          <span class="slider-val" id="med-val">65</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="med-w-disp">24</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 20–28%</span>
+        </div>
+        <input type="range" id="med-score" min="0" max="100" value="65" />
+        <input type="range" id="med-w" min="20" max="28" value="24" />
+      </div>
+
+      <!-- SCI -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">SCI — Shooting Convergence</span>
+          <span class="slider-val" id="sci-val">58</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="sci-w-disp">17</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 14–20%</span>
+        </div>
+        <input type="range" id="sci-score" min="0" max="100" value="58" />
+        <input type="range" id="sci-w" min="14" max="20" value="17" />
+      </div>
+
+      <!-- FTI -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">FTI — Free Throw Interaction</span>
+          <span class="slider-val" id="fti-val">45</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="fti-w-disp">15</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 12–18%</span>
+        </div>
+        <input type="range" id="fti-score" min="0" max="100" value="45" />
+        <input type="range" id="fti-w" min="12" max="18" value="15" />
+      </div>
+
+      <!-- SSS -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">SSS — Spread Stability</span>
+          <span class="slider-val" id="sss-val">80</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="sss-w-disp">11</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 8–14%</span>
+        </div>
+        <input type="range" id="sss-score" min="0" max="100" value="80" />
+        <input type="range" id="sss-w" min="8" max="14" value="11" />
+      </div>
+
+      <h3 style="font-family:var(--head);font-size:0.8rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--cyan);margin-bottom:1.2rem;margin-top:1.5rem;">Secondary Variables (MC Calibrated)</h3>
+
+      <!-- OCI -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">OCI — ORTG Compression</span>
+          <span class="slider-val" id="oci-val">60</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="oci-w-disp">6</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 5–12%</span>
+        </div>
+        <input type="range" id="oci-score" min="0" max="100" value="60" class="secondary-slider" />
+        <input type="range" id="oci-w" min="5" max="12" value="6" class="secondary-slider" />
+      </div>
+
+      <!-- D3PC -->
+      <div class="slider-group">
+        <div class="slider-header">
+          <span class="slider-name">D3PC — Defensive 3P Compat.</span>
+          <span class="slider-val" id="d3pc-val">55</span>
+        </div>
+        <div class="slider-sub">
+          <span class="slider-weight">Weight: <span id="d3pc-w-disp">5</span>%</span>
+          <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);">Range: 5–12%</span>
+        </div>
+        <input type="range" id="d3pc-score" min="0" max="100" value="55" class="secondary-slider" />
+        <input type="range" id="d3pc-w" min="5" max="12" value="5" class="secondary-slider" />
+      </div>
+
+      <div class="weight-warning" id="weight-warn"></div>
+    </div>
+
+    <!-- Output Panel -->
+    <div>
+      <div class="output-panel">
+        <div class="output-title">Confidence Score Output</div>
+
+        <div class="conf-score-display">
+          <div class="conf-big" id="conf-big">64.3</div>
+          <div class="conf-label">CONF SCORE / 100</div>
+        </div>
+
+        <div class="gauge">
+          <div class="gauge-fill" id="gauge-fill" style="width:64.3%;"></div>
+        </div>
+        <div class="threshold-line">
+          <div class="thresh-mark"></div>
+          <span>80% threshold — model confidence minimum</span>
+        </div>
+
+        <ul class="breakdown-list" id="breakdown-list">
+          <li><span class="bl-name">PAC contribution</span><span class="bl-val" id="bl-pac">—</span></li>
+          <li><span class="bl-name">MED contribution</span><span class="bl-val" id="bl-med">—</span></li>
+          <li><span class="bl-name">SCI contribution</span><span class="bl-val" id="bl-sci">—</span></li>
+          <li><span class="bl-name">FTI contribution</span><span class="bl-val" id="bl-fti">—</span></li>
+          <li><span class="bl-name">SSS contribution</span><span class="bl-val" id="bl-sss">—</span></li>
+          <li><span class="bl-name">OCI contribution</span><span class="bl-val" id="bl-oci">—</span></li>
+          <li><span class="bl-name">D3PC contribution</span><span class="bl-val" id="bl-d3pc">—</span></li>
+          <li><span class="bl-name">Total weight sum</span><span class="bl-val" id="bl-wsum">—</span></li>
+          <li><span class="bl-name">Core weight sum</span><span class="bl-val" id="bl-coresum">—</span></li>
+          <li><span class="bl-name">Secondary weight sum</span><span class="bl-val" id="bl-secsum">—</span></li>
+        </ul>
+
+        <div class="verdict-box" id="verdict-box">
+          <div class="verdict-text" id="verdict-text">—</div>
+          <div class="verdict-sub" id="verdict-sub">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MONTE CARLO -->
+<div id="montecarlo">
+  <div class="inner">
+    <p class="section-label">Weight Optimization</p>
+    <h2 class="section-title">Monte Carlo Simulator</h2>
+    <div class="divider"></div>
+
+    <div class="mc-layout">
+      <div class="mc-panel">
+        <div class="mc-title">Simulation Controls</div>
+
+        <div class="mc-control">
+          <div class="mc-label">ITERATIONS</div>
+          <select class="mc-select" id="mc-iters">
+            <option value="1000">1,000 (Fast Preview)</option>
+            <option value="5000" selected>5,000 (Standard)</option>
+            <option value="10000">10,000 (Thorough)</option>
+            <option value="25000">25,000 (Deep)</option>
+          </select>
+        </div>
+
+        <div class="mc-control">
+          <div class="mc-label">OPTIMIZATION TARGET</div>
+          <select class="mc-select" id="mc-target">
+            <option value="hit">Maximize Hit Rate</option>
+            <option value="ev">Maximize EV</option>
+            <option value="combined" selected>Combined F-Score</option>
+          </select>
+        </div>
+
+        <div class="mc-control">
+          <div class="mc-label">DRAWDOWN LIMIT</div>
+          <select class="mc-select" id="mc-drawdown">
+            <option value="0.08">8% Conservative</option>
+            <option value="0.12" selected>12% Standard</option>
+            <option value="0.18">18% Aggressive</option>
+          </select>
+        </div>
+
+        <button class="mc-run-btn" id="mc-run-btn" type="button">Run Simulation</button>
+
+        <div class="mc-progress-wrap" id="mc-progress-wrap" style="display:none;">
+          <div class="mc-progress-bar-bg">
+            <div class="mc-progress-bar-fill" id="mc-prog"></div>
+          </div>
+          <div class="mc-progress-label" id="mc-prog-label">Initializing...</div>
+        </div>
+
+        <div class="mc-results" id="mc-results" style="display:none;">
+          <div class="mc-result-row"><span class="mc-rkey">Best F-Score</span><span class="mc-rval" id="mc-r-fscore">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Best Hit Rate</span><span class="mc-rval" id="mc-r-hit">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Best EV</span><span class="mc-rval" id="mc-r-ev">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Optimal w6 (OCI)</span><span class="mc-rval" id="mc-r-w6">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Optimal w7 (D3PC)</span><span class="mc-rval" id="mc-r-w7">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Sharpe Ratio (sim)</span><span class="mc-rval" id="mc-r-sharpe">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Max Drawdown</span><span class="mc-rval" id="mc-r-dd">—</span></div>
+          <div class="mc-result-row"><span class="mc-rkey">Iterations Run</span><span class="mc-rval" id="mc-r-iters">—</span></div>
+        </div>
+      </div>
+
+      <div class="mc-panel">
+        <div class="mc-title">F-Score Distribution (Simulation Output)</div>
+        <canvas id="mcCanvas" height="260"></canvas>
+        <p style="font-family:var(--mono);font-size:0.68rem;color:var(--text-dim);margin-top:0.8rem;">
+          Histogram of F-Score values across all valid simulated weight sets. Peak indicates the most likely optimal weight configuration.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DEPLOYMENT RULES -->
+<section id="deploy">
+  <p class="section-label">Production Rules</p>
+  <h2 class="section-title">Deployment Thresholds</h2>
+  <div class="divider"></div>
+  <div class="rules-grid">
+    <div class="rule-card">
+      <div class="rule-icon">&#9654;</div>
+      <div class="rule-title">Hit Rate Minimum</div>
+      <div class="rule-val">57%</div>
+      <div class="rule-desc">Minimum required hit rate for totals before deploying weight set to production.</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">&#9654;</div>
+      <div class="rule-title">Parlay EV Floor</div>
+      <div class="rule-val">&gt; 8%</div>
+      <div class="rule-desc">Expected value per parlay must exceed 8% for the configuration to be used.</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">&#9654;</div>
+      <div class="rule-title">Secondary Stability</div>
+      <div class="rule-val">Multi-Season</div>
+      <div class="rule-desc">Secondary weights (OCI, D3PC) must be stable across at least two full seasons of data.</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">&#9654;</div>
+      <div class="rule-title">Recalibration Cycle</div>
+      <div class="rule-val">Quarterly</div>
+      <div class="rule-desc">Full Monte Carlo recalibration must occur every quarter to maintain weight validity.</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">&#9655;</div>
+      <div class="rule-title">Reject: Overfitting</div>
+      <div class="rule-val" style="color:var(--red);">DISCARD</div>
+      <div class="rule-desc">Reject any weight set that shows signs of overfitting to a single season of data.</div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-icon">&#9655;</div>
+      <div class="rule-title">Reject: MED Dominance</div>
+      <div class="rule-val" style="color:var(--red);">DISCARD</div>
+      <div class="rule-desc">Reject if the model shows excessive reliance on MED alone for confidence generation.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">ARF // TOTALS MODEL v1</div>
+  <div class="footer-copy">Reduced Core Build &mdash; 7 Variables &mdash; Monte Carlo Optimized &mdash; NBA Totals</div>
+</footer>
+
+<!-- ============================
+     JAVASCRIPT
+============================ -->
+<script>
+  /* ---- CALCULATOR ---- */
+  const vars = [
+    { score: 'pac-score', w: 'pac-w', wDisp: 'pac-w-disp', val: 'pac-val', bl: 'bl-pac' },
+    { score: 'med-score', w: 'med-w', wDisp: 'med-w-disp', val: 'med-val', bl: 'bl-med' },
+    { score: 'sci-score', w: 'sci-w', wDisp: 'sci-w-disp', val: 'sci-val', bl: 'bl-sci' },
+    { score: 'fti-score', w: 'fti-w', wDisp: 'fti-w-disp', val: 'fti-val', bl: 'bl-fti' },
+    { score: 'sss-score', w: 'sss-w', wDisp: 'sss-w-disp', val: 'sss-val', bl: 'bl-sss' },
+    { score: 'oci-score', w: 'oci-w', wDisp: 'oci-w-disp', val: 'oci-val', bl: 'bl-oci' },
+    { score: 'd3pc-score', w: 'd3pc-w', wDisp: 'd3pc-w-disp', val: 'd3pc-val', bl: 'bl-d3pc' }
+  ];
+
+  function updateCalc() {
+    let conf = 0;
+    let wsum = 0;
+    let coreW = 0;
+    let secW = 0;
+
+    vars.forEach(function(v, i) {
+      var s = parseFloat(document.getElementById(v.score).value);
+      var w = parseFloat(document.getElementById(v.w).value);
+      var contrib = (s * w) / 100;
+      conf += contrib;
+      wsum += w;
+      if (i < 5) { coreW += w; } else { secW += w; }
+
+      document.getElementById(v.val).textContent = Math.round(s);
+      document.getElementById(v.wDisp).textContent = Math.round(w);
+      document.getElementById(v.bl).textContent = contrib.toFixed(2);
+    });
+
+    var confDisp = conf.toFixed(1);
+    document.getElementById('conf-big').textContent = confDisp;
+    document.getElementById('gauge-fill').style.width = Math.min(conf, 100) + '%';
+
+    // Color coding
+    var bigEl = document.getElementById('conf-big');
+    bigEl.classList.remove('high', 'low');
+    if (conf >= 80) { bigEl.classList.add('high'); }
+    else if (conf < 60) { bigEl.classList.add('low'); }
+
+    // Breakdown
+    document.getElementById('bl-wsum').textContent = wsum.toFixed(1) + '%';
+    document.getElementById('bl-coresum').textContent = coreW.toFixed(1) + '%';
+    document.getElementById('bl-secsum').textContent = secW.toFixed(1) + '%';
+
+    // Warnings
+    var warn = '';
+    if (Math.abs(wsum - 100) > 1) { warn = '⚠ Weights sum to ' + wsum.toFixed(1) + '% (must = 100%)'; }
+    else if (coreW < 75) { warn = '⚠ Core weights below 75% minimum (' + coreW.toFixed(1) + '%)'; }
+    else if (secW > 25) { warn = '⚠ Secondary weights exceed 25% cap (' + secW.toFixed(1) + '%)'; }
+    document.getElementById('weight-warn').textContent = warn;
+
+    // Verdict
+    var vBox = document.getElementById('verdict-box');
+    var vText = document.getElementById('verdict-text');
+    var vSub = document.getElementById('verdict-sub');
+    vBox.classList.remove('pass', 'fail');
+
+    if (conf >= 80 && !warn) {
+      vBox.classList.add('pass');
+      vText.textContent = 'SIGNAL VALID';
+      vSub.textContent = 'CONF ≥ 80% · Constraints met · Deploy eligible';
+    } else if (warn) {
+      vBox.classList.add('fail');
+      vText.textContent = 'CONSTRAINT ERROR';
+      vSub.textContent = warn;
+    } else {
+      vBox.classList.add('fail');
+      vText.textContent = 'BELOW THRESHOLD';
+      vSub.textContent = 'CONF = ' + confDisp + ' · Minimum 80 required';
+    }
+  }
+
+  // Attach listeners
+  vars.forEach(function(v) {
+    document.getElementById(v.score).addEventListener('input', updateCalc);
+    document.getElementById(v.w).addEventListener('input', updateCalc);
+  });
+
+  updateCalc();
+
+  /* ---- MONTE CARLO ---- */
+  var mcRunning = false;
+  var mcHistData = [];
+
+  function randBetween(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  function runMonteCarlo() {
+    if (mcRunning) { return; }
+    mcRunning = true;
+
+    var btn = document.getElementById('mc-run-btn');
+    btn.disabled = true;
+    document.getElementById('mc-progress-wrap').style.display = 'block';
+    document.getElementById('mc-results').style.display = 'none';
+
+    var iters = parseInt(document.getElementById('mc-iters').value);
+    var target = document.getElementById('mc-target').value;
+    var ddLimit = parseFloat(document.getElementById('mc-drawdown').value);
+
+    var bestF = -Infinity;
+    var bestHit = 0;
+    var bestEV = 0;
+    var bestW6 = 0;
+    var bestW7 = 0;
+    var bestSharpe = 0;
+    var bestDD = 0;
+    var validCount = 0;
+    mcHistData = [];
+
+    var batchSize = Math.max(50, Math.floor(iters / 100));
+    var done = 0;
+
+    function runBatch() {
+      var end = Math.min(done + batchSize, iters);
+      for (var i = done; i < end; i++) {
+        // Sample weights
+        var w1 = randBetween(18, 26);
+        var w2 = randBetween(20, 28);
+        var w3 = randBetween(14, 20);
+        var w4 = randBetween(12, 18);
+        var w5 = randBetween(8, 14);
+        var w6 = randBetween(5, 12);
+        var w7 = randBetween(5, 12);
+
+        var total = w1 + w2 + w3 + w4 + w5 + w6 + w7;
+        var coreSum = w1 + w2 + w3 + w4 + w5;
+        var secSum = w6 + w7;
+
+        // Normalize
+        w1 /= total; w2 /= total; w3 /= total;
+        w4 /= total; w5 /= total; w6 /= total; w7 /= total;
+        coreSum = (w1 + w2 + w3 + w4 + w5) * 100;
+        secSum = (w6 + w7) * 100;
+
+        if (coreSum < 75 || secSum > 25) { continue; }
+
+        // Simulate performance with noise
+        var baseHit = 0.50 + (w2 * 0.4) + (w1 * 0.2) + (w3 * 0.15) + (w6 + w7) * 0.1;
+        var hitRate = Math.min(0.72, baseHit + (Math.random() - 0.5) * 0.08);
+        var ev = (hitRate - 0.526) * 1.91 + (Math.random() - 0.5) * 0.04;
+        var stability = 0.5 + hitRate * 0.3 + Math.random() * 0.2;
+        var dd = Math.max(0, 0.04 + (1 - hitRate) * 0.12 + Math.random() * 0.06);
+        var sharpe = ev / (0.05 + dd * 0.5);
+
+        if (dd > ddLimit) { continue; }
+
+        var fScore;
+        if (target === 'hit') { fScore = hitRate; }
+        else if (target === 'ev') { fScore = ev; }
+        else { fScore = 0.5 * hitRate + 0.3 * ev + 0.2 * stability; }
+
+        mcHistData.push(fScore);
+        validCount++;
+
+        if (fScore > bestF) {
+          bestF = fScore;
+          bestHit = hitRate;
+          bestEV = ev;
+          bestW6 = w6 * 100;
+          bestW7 = w7 * 100;
+          bestSharpe = sharpe;
+          bestDD = dd;
+        }
+      }
+      done = end;
+
+      var pct = (done / iters * 100).toFixed(0);
+      document.getElementById('mc-prog').style.width = pct + '%';
+      document.getElementById('mc-prog-label').textContent =
+        'Iteration ' + done + ' / ' + iters + ' — Valid: ' + validCount;
+
+      if (done < iters) {
+        setTimeout(runBatch, 0);
+      } else {
+        finalizeMC();
+      }
+    }
+
+    function finalizeMC() {
+      document.getElementById('mc-r-fscore').textContent = bestF.toFixed(4);
+      document.getElementById('mc-r-hit').textContent = (bestHit * 100).toFixed(1) + '%';
+      document.getElementById('mc-r-ev').textContent = (bestEV * 100).toFixed(2) + '%';
+      document.getElementById('mc-r-w6').textContent = bestW6.toFixed(2) + '%';
+      document.getElementById('mc-r-w7').textContent = bestW7.toFixed(2) + '%';
+      document.getElementById('mc-r-sharpe').textContent = bestSharpe.toFixed(3);
+      document.getElementById('mc-r-dd').textContent = (bestDD * 100).toFixed(1) + '%';
+      document.getElementById('mc-r-iters').textContent = iters.toLocaleString();
+
+      document.getElementById('mc-results').style.display = 'block';
+      drawHistogram();
+      btn.disabled = false;
+      mcRunning = false;
+    }
+
+    setTimeout(runBatch, 50);
+  }
+
+  function drawHistogram() {
+    var canvas = document.getElementById('mcCanvas');
+    var ctx = canvas.getContext('2d');
+    var W = canvas.offsetWidth;
+    var H = 260;
+    canvas.width = W;
+    canvas.height = H;
+
+    if (mcHistData.length === 0) { return; }
+
+    var min = Math.min.apply(null, mcHistData);
+    var max = Math.max.apply(null, mcHistData);
+    var bins = 40;
+    var counts = new Array(bins).fill(0);
+    mcHistData.forEach(function(v) {
+      var idx = Math.min(bins - 1, Math.floor((v - min) / (max - min) * bins));
+      counts[idx]++;
+    });
+
+    var maxCount = Math.max.apply(null, counts);
+    var pad = { top: 20, right: 20, bottom: 30, left: 20 };
+    var cW = (W - pad.left - pad.right) / bins;
+    var scaleH = (H - pad.top - pad.bottom) / maxCount;
+
+    // Background
+    ctx.fillStyle = '#0c1824';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(26,53,80,0.8)';
+    ctx.lineWidth = 1;
+    for (var g = 0; g <= 4; g++) {
+      var y = pad.top + (H - pad.top - pad.bottom) * g / 4;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(W - pad.right, y);
+      ctx.stroke();
+    }
+
+    // Bars
+    counts.forEach(function(c, i) {
+      var x = pad.left + i * cW;
+      var bH = c * scaleH;
+      var y = H - pad.bottom - bH;
+      var ratio = i / bins;
+      // color gradient red -> amber -> green
+      var r, g, b;
+      if (ratio < 0.5) {
+        r = 255; g = Math.round(ratio * 2 * 165); b = 0;
+      } else {
+        r = Math.round((1 - (ratio - 0.5) * 2) * 240);
+        g = Math.round(165 + (ratio - 0.5) * 2 * 91);
+        b = 0;
+        if (ratio > 0.8) { g = 230; b = Math.round((ratio - 0.8) * 5 * 118); r = Math.max(0, Math.round(r - (ratio - 0.8) * 5 * 200)); }
+      }
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.fillRect(x + 1, y, cW - 2, bH);
+    });
+
+    // X-axis labels
+    ctx.fillStyle = '#5a7e9a';
+    ctx.font = '10px Share Tech Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(min.toFixed(3), pad.left, H - 8);
+    ctx.fillText(((min + max) / 2).toFixed(3), W / 2, H - 8);
+    ctx.fillText(max.toFixed(3), W - pad.right, H - 8);
+  }
+
+  document.getElementById('mc-run-btn').addEventListener('click', runMonteCarlo);
+</script>
+
+</body>
+</html>
