@@ -55,7 +55,7 @@
         rgba(0,0,0,0.07) 4px
       );
       pointer-events: none;
-      z-index: 9999;
+      z-index: 998;
     }
 
     /* ============================
@@ -1300,7 +1300,7 @@
 
       <div class="mc-panel">
         <div class="mc-title">F-Score Distribution (Simulation Output)</div>
-        <canvas id="mcCanvas" height="260"></canvas>
+        <canvas id="mcCanvas" style="width: 100%; height: auto; display: block;"></canvas>
         <p style="font-family:var(--mono);font-size:0.68rem;color:var(--text-dim);margin-top:0.8rem;">
           Histogram of F-Score values across all valid simulated weight sets. Peak indicates the most likely optimal weight configuration.
         </p>
@@ -1565,12 +1565,12 @@
   }
 
   function drawHistogram() {
-    var canvas = document.getElementById('mcCanvas');
-    var ctx = canvas.getContext('2d');
-    var W = canvas.offsetWidth;
-    var H = 260;
-    canvas.width = W;
-    canvas.height = H;
+  var canvas = document.getElementById('mcCanvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.parentElement.offsetWidth || window.innerWidth - 40;
+  var H = 260;
+  canvas.width = W;
+  canvas.height = H;
 
     if (mcHistData.length === 0) { return; }
 
